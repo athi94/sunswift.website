@@ -1,21 +1,21 @@
 <?php
 require_once("config.inc.php");
 require_once("Class.Parser.php");
-require_once("Class.Buffer.php");
+require_once("Class.Live.php");
 
-$buffer = new Buffer($config);
+$live = new Live($config);
 
 $res = opendir("images/");
 while ($file = readdir($res)) {
 	if ($file =="." || $file =="..") continue;
 	$data =  exif_read_data("images/$file");
 	$time = @strtotime($data["DateTimeOriginal"]);
-	$latlongs = $buffer->getClosestLatLng($time);
+	$latlongs = $live->getClosestLatLng($time);
 	$in = array(
 		'photo_name' => $file,
 		'time' => $latlongs[0]['timestamp']
 	);
-	$buffer->AppendDBWithPhotos($in);
+	$live->AppendDBWithPhotos($in);
 }
 
 

@@ -1,35 +1,34 @@
 <?php
 require_once("config.inc.php");
 require_once("Class.Parser.php");
-require_once("Class.Buffer.php");
+require_once("Class.Live.php");
 
-$buffer = new Buffer($config);
+$live = new Live($config);
 
 if (empty($_GET['do'])) {
-	$buffer->throwError();
+	$live->throwError();
 }
 
 switch ($_GET['do']) {
 	case 'closestupdate':	
-		if (empty($_GET['time'])) $buffer->throwError();
-		else echo $buffer->getClosestData($_GET['time']);
+		if (empty($_GET['time'])) $live->throwError();
+		else echo $live->getClosestData($_GET['time']/1000);
 	break;
 	case 'lastbatch':
-		if (empty($_GET['time'])) $buffer->throwError();
-		else echo $buffer->getLastBatch($_GET['time']);
+		if (empty($_GET['time'])) $live->throwError();
+		else echo $live->getLastBatch($_GET['time']/1000);
 	break;
 	case 'time':
 		$date = date_create();
-		echo json_encode(array("time"=>date_timestamp_get($date)));
+		echo json_encode(array("time"=>date_timestamp_get($date)*1000));
 	break;
 	case 'lastupdate':
-		echo $buffer->getOldestData();
+		echo $live->getOldestData();
 	break;
 	default:
-		$buffer->throwError();
+		$live->throwError();
 	break;
 }
 
-
-$buffer->cleanUp();
+$live->cleanUp();
 ?>

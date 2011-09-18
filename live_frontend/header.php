@@ -25,7 +25,7 @@
 	if ( $paged >= 2 || $page >= 2 )
 		echo ' | ' . sprintf( __( 'Page %s', 'sunswift' ), max( $paged, $page ) );
 	?></title>
-<link rel="stylesheet" href="/wp-content/themes/sunswift/style.css" type="text/css" media="screen" title="no title" charset="utf-8">
+<link rel="stylesheet" href="<?php echo PATHPREFIX; ?>style.css" type="text/css" media="screen" title="no title" charset="utf-8">
 <!--[if IE]>
 <link rel="stylesheet" type="text/css" media="all" href="/wp-content/themes/sunswift/styles/style-ie.css" />
 <![endif]-->
@@ -57,15 +57,20 @@ $(window).load(function(){
 </script>
 <![endif]-->
 <script type="text/javascript">
+<?php 
+echo "PATHPREFIX = '".PATHPREFIX."';";
+// Bad hack
+$ls = ($_SERVER['SERVER_NAME']=='localhost') ? 'localhost:8000' : '49.156.18.20/api';
+echo "LIVESERVER = '".$ls."';"; 
+?>
+var _gaq = _gaq || [];
+_gaq.push(['_setAccount', 'UA-8965962-4']);
+_gaq.push(['_trackPageview']);
 
-  var _gaq = _gaq || [];
-  _gaq.push(['_setAccount', 'UA-8965962-4']);
-  _gaq.push(['_trackPageview']);
-
-  (function() {
-    var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-    ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-  })();
+(function() {
+  var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+  ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+  var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+})();
 </script>
 </head>

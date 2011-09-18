@@ -11,7 +11,8 @@ add_action( 'after_setup_theme', 'sunswift_setup' );
 if ( ! function_exists( 'sunswift_setup' ) ):
 
 function sunswift_setup () {
-	define('PATHPREFIX', '/wp-content/themes/sunswift/');
+	if ($_SERVER['SERVER_NAME']=='localhost') define('PATHPREFIX', '/wordpress/wp-content/themes/sunswift/');
+	else define('PATHPREFIX', '/wp-content/themes/sunswift/');	
 	
 	define( 'LOGO_IMAGE', PATHPREFIX.'/images/logo.png' );	// TODO: Not hardcoded
 	define( 'SCRIPTSPATH', PATHPREFIX.'js');
@@ -180,7 +181,7 @@ endif;
 
 function get_live_replay_events() {
 ?>
-<select id="replay_events">
+<select id="replay_events" onchange="replaySliderChange()">
 	<option value="default">Loading...</option>
 </select>
 

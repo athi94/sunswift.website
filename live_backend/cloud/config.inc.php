@@ -5,7 +5,8 @@ $config = array(
 		'user' => 'root',
 		'pass' => '',
 		'database' => 'sunswift_live',
-		'table' => 'log'
+		'table' => 'log',
+		'eventtable' => 'events'
 	)
 
 ?>

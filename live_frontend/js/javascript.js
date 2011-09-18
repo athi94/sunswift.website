@@ -5,26 +5,21 @@ var tweets = [];
 var TWITTERINTERVAL = 60000;
 var CR = 5;
 // Live 
-var REALTIME = 'Replay'			// Options: Realtime, Socket, Replay
+var REALTIME = 'Realtime'			// Options: Realtime, Socket, Replay
 var LIVEDURATION = 2000;
+var REALTIMEUPDATEINTERVAL = 60000;
+var POLLINTERVAL = 2000;
 var ROUND = 100;
 var MAPTYPE = 'Maps';				// Options: Earth, Maps
 var PATHPREFIX = '/wp-content/themes/sunswift';
+var LIVESERVER = '49.156.18.20';
 var MAXARRAY = 1300;
-var BATCHLENGTH = 60;
+var BATCHLENGTH = 2000;
 var dataTypes = [
-	{'label':'arraypower','suffix':'W'},
 	{'label':'motorpower','suffix':'W'},
 	{'label':'batterypower','suffix':'W'}
 ];
-/*
-{'label':'motortemp'},
-{'label':'arraypower','suffix':'W'},
-{'label':'motorpower','suffix':'W'},
-{'label':'latitude','suffix':''},
-{'label':'longitude','suffix':''},
-{'label':'heatsinktemp'},
-*/
+var polling=true;		// Config variable to set whether we should do polling or buffered realtime
 var follow = true;
 var allData = Array();
 var curkey = 1;
@@ -42,7 +37,6 @@ var placemark;
 var finalSpeed = 0;
 var time=[];
 var tmpVal=[];
-var worker;
 var updateIv=[]; 			// Burst update interval
 var iv;					// Update value interval
 var sb;					// Standby interval
@@ -55,17 +49,14 @@ var timeOffset;
 var online=false;
 var nextupdate=15;
 var lostconniv;
-var dots = 1;
+var dots = 0;
 var events;
 
 
-function $_GET()
-{
+function $_GET() {
     var vars = [], hash;
     var hashes = window.location.href.slice(window.location.href.indexOf('?') + 1).split('&');
- 
-    for(var i = 0; i < hashes.length; i++)
-    {
+    for(var i = 0; i < hashes.length; i++) {
         hash = hashes[i].split('=');
         vars.push(hash[0]);
         vars[hash[0]] = hash[1];
@@ -240,18 +231,27 @@ function launchLive() {
 			}
 		});
 		
+		
+
 		// Now the meaty bits
 		loadMaps();
-		initialize();
+		//loadEarth();
+		//initialize();
+		
+		$("input:radio[name=radio]").each(function() {
+			if ($(this).val()==REALTIME) $(this).click();
+		});
+		
+		
 		_gaq.push(['_trackEvent', 'Live', 'Initialised']);
 		//twitteriv = setInterval("updateTweetMaps();", TWITTERINTERVAL);
 	});
 }
 
 function stopAllIntervals() {
+	$("#array-inner-progress").stop();	
 	clearInterval(iv);
 	for (i in updateIv) clearInterval(updateIv[i]);
-	$("#array-inner-progress").stop();	
 }
 
 function updateTweetMaps() {
@@ -466,17 +466,20 @@ function relative_time(time_value) {
 *	LIVE Code
 */
 
+/*
+*	State Functions
+*/
+
+
 function initialize () {
+	online=true;
 	switch (REALTIME) {
 		case 'Realtime':
-			startRealTime();
-			break;
-		case 'Socket':
-			connectToSocketServer();
+			if (polling) startPolledRealTime();
+			else startRealTime();
 			break;
 		case 'Replay':
-			$.getScript("http://49.156.18.20/api/events.json?callback=initEvents")
-			
+			$.getScript("http://"+LIVESERVER+"/events.json?callback=initEvents");
 			break;
 	}	
 }
@@ -485,49 +488,36 @@ function stopLive () {
 	switch (REALTIME) {
 		case 'Realtime':
 			clearInterval(iv);	
+			clearInterval(sb);	
 			for (i in updateIv) clearInterval(updateIv[i]);		
-			break;
-		case 'Socket':
-			// kill server code
 			break;
 		case 'Replay':
 			clearInterval(iv);
+			try {
+				clearInterval(polledIv);
+			}
+			catch (err) {}
 			for (i in updateIv) clearInterval(updateIv[i]);
 			break;
 	}	
-}
-
-function startRealTime() {
-	$.getJSON('/live/cloud/api.php?do=time', function(server) {
-		setInternalTime(server.time);
-		var since = current_time-BATCHLENGTH;
-		$.getJSON('/live/cloud/api.php?do=lastbatch&time='+since, function(data) {
-			if (data==null) {
-				$.getJSON('/live/cloud/api.php?do=lastupdate', function(data) {
-					allData=data
-					updateValues();
-				});
-				standby();
-			}
-			else {
-				allData = data;
-				iv = setInterval("updateRealTime()", LIVEDURATION); // TODO: 2000				
-			}
-		
-		});
-	});
-}
+};
 
 function standby () {
 	if (online) {
+		online = false;
 		clearInterval(iv);
 		for (i in updateIv) clearInterval(updateIv[i]);		
-		online = false;
 		switch (REALTIME) {
 			case "Realtime":
 				makeLostConnectionOverlay();
-				getNewestBatch();
-				sb = setInterval("getNewestBatch()",30000); // TODO 60000 ?
+				if (polling) {
+					
+				}
+				else {
+					// This is buggy
+					getNewestBatch();
+					sb = setInterval("getNewestBatch()",30000); // TODO 60000 ?
+				}
 			break;
 			case "Replay":
 				makeEndOfDataOverlay();
@@ -537,10 +527,10 @@ function standby () {
 }
 
 
-
 function changeState(state) {
 	REALTIME = state;
 	stopLive();
+	exitStandby();
 	switch(REALTIME) {
 		case "Replay":
 			$("#offline").fadeOut("fast");
@@ -552,44 +542,180 @@ function changeState(state) {
 			break;
 	}
 	initialize();
-	updateValues();
-}
+	//updateValues();
+};
 
 function exitStandby() {
 	curkey=1;
-	REALTIME = "Replay";
-	getReplayValues();
+	//changeState(REALTIME);
+	online=true;
 	$("#offline").fadeOut("fast");
 	$("#live_container").animate({opacity:"1"}, "fast");
 	clearTimeout(lostconniv);
 	//alert ("Solar car is online");
 };
 
-function setInternalTime(time) {
+function setInternalTime(serverResponse) {
 	var now = new Date();
-	timeOffset = time - now.getTime()/1000;
-	current_time = time;
+	timeOffset = serverResponse.time - now.getTime();
+	current_time = serverResponse.time;
+	$(document).trigger('InternalTimeSetEvent',[{result:1}]);
 };
 
 function getInternalTime() {
 	var now = new Date();
-	return now.getTime() + timeOffset;
+	return (now.getTime() + timeOffset);
 };
 
+function makeLostConnectionOverlay() {
+	//$("#live_container").animate({opacity:"0.5"}, "slow");
+	$("#map_canvas").after("<div id='offline'><span id='offline_text'>Searching</span></div>");
+	
+	///$("#offline")
+	$("#offline").fadeIn("slow");
+	lostconniv = setInterval(function() {
+		lostConnOverlayDots();
+	},1000);
+	setTimeout(function() {
+		if (!online) {
+			//$("#offline").append("<br />Check our twitter to see when we'll next be on the road!");
+		}
+	},3000);
+}
+
+function makeEndOfDataOverlay() {
+	$("#live_container").animate({opacity:"0.5"}, "slow");
+	$("#map_canvas").after("<div id='offline'><span id='offline_text'>End of replay. Click to restart.</span></div>");
+	$("#offline").fadeIn("slow").click(function() {
+		exitStandby();
+		initialize();
+	});
+}
+
+function lostConnOverlayDots () {
+	if (dots==3) {
+		$("#offline_text").html("Searching");
+		dots=0;
+	}
+	else {
+		$("#offline_text").append(".");
+		dots++;
+	}
+}
+
+/*
+*	Polled Realtime Functions
+*/
+
+function startPolledRealTime() {
+	try {
+		clearInterval(polledIv);	
+	} 
+	catch (err) {};
+	polledIv = setInterval(function() {
+		$.getScript('http://'+LIVESERVER+'/lastupdate.json?callback=updatePolledData');
+	},POLLINTERVAL);
+};
+
+function updatePolledData(data) {
+	if (!data && online) {
+		standby();
+		return;
+	}
+	// If we get data but it's greater than a minute old standby (need to verify this is the right move)
+	else if (data && ((new Date).getTime()-data.timestamp)>60000) {
+		standby();
+		$('#data-age').html("Data is "+relative_live_time(data.timestamp));
+		return;
+	}
+	else if (data && !online) {
+		exitStandby();
+	}
+	else if (!data && !online) return;
+	//console.log(data);
+	
+	if (!data.latitude || !data.longitude || data.latitude==0 || data.longitude==0) { 
+		try { 
+			marker.setMap(map);
+			map.setZoom(4); 
+			
+		} catch (err) { 
+			console.log(err);
+		}
+	}				
+	else {
+		data.latitude = Math.round(data.latitude/60000*10000)/10000;
+		data.longitude = Math.round(data.longitude/60000*10000)/10000;
+		if (map_loaded) updateMap("right", data.speed+" km/h",data.latitude,data.longitude);
+		// Add photo if one exists
+		var dist = Math.round(distance(data.latitude, data.longitude, "-34.927165", "138.599691", "K")*ROUND)/ROUND;
+		if (data.photo) addPhotoToMap();
+	}
+
+	data.batterypower = Math.round(data.batterypower*ROUND*-1)/ROUND;
+	data.motorpower = Math.round(data.motorpower*ROUND*-1)/ROUND;
+	data.heatsinktemp = data.heatsinktemp/1000;
+	data.motortemp = data.motortemp/1000;
+	data.speed = Math.round(data.speed/10)/100;
+	data.arraypower = (data.arraypower*-1)/MAXARRAY*100+"%";
+
+	// Change the flash dials
+	try {
+		$('#speedo object').flash(function(){ this.changeSpeed(data.speed); });
+		$('#motortemp object').flash(function(){ this.changeTemperature(data.heatsinktemp); });
+		$('#heatsinktemp object').flash(function(){ this.changeTemperature(data.motortemp); });	
+	}
+	catch (e) {}
+
+	$("#batterypower").html(data.batterypower);
+	$("#motorpower").html(data.motorpower);
+	$("#distancetime").html('Distance to Adelaide<br /><span class="temp-data">'+dist+'</span><span class="data-unit">Kilometres</span>')
+	$("#array-inner-progress").animate({height:data.arraypower},1000);	
+	$('#data-age').html("Data is "+relative_live_time(data.timestamp));
+	
+}
+
+/*
+*	Buffered Realtime functions
+*/
+
+function startRealTime() {
+	stopLive();
+	$.getScript('http://'+LIVESERVER+'/time.json?callback=setInternalTime');
+	$(document).one('InternalTimeSetEvent',function(eventType,response) {
+		var since = getInternalTime()-BATCHLENGTH;
+		console.log(since);
+		$.get('/live/cloud/api.php?do=lastbatch&time='+since, function(data) {
+			if (!data) {
+				$.get('/live/cloud/api.php?do=lastupdate', function(data) {
+					online=true;
+					allData=JSON.parse(data)
+					updateValues();
+					standby();
+				});
+			}
+			else {
+				allData = JSON.parse(data);
+				iv = setInterval("updateRealTime()", LIVEDURATION); // TODO: 2000				
+			}
+		});
+	});
+}
+
 function getNewestBatch() {
-	var time = getInternalTime()-60;
-	$.getJSON('/live/cloud/api.php?do=lastbatch&time='+time, function(data) {
-		if (allData !== data && data !== null) {
-			appendNewData(data);
+	var time = getInternalTime()-BATCHLENGTH;
+	$.get('/live/cloud/api.php?do=lastbatch&time='+time, function(data) {
+		if (allData !== data && data) {
+			appendNewData(JSON.parse(data));
 			clearInterval(sb);
 			if (online == false) {
 				exitStandby();
 			}
 			clearInterval(iv);
-			iv = setInterval("updateRealTime()", 1000);
+			iv = setInterval("updateRealTime()", 2000);
 		}
 		else {
-			//
+			// Do nothing
 		}
 	});
 }
@@ -597,79 +723,74 @@ function getNewestBatch() {
 function appendNewData (data) {
 	var out = [];
 	var record = false;
-	// Get the last set of data from the array to find out where it ends.
-	var lasttime = allData[allData.length-1].timestamp;
-	var tmp = [];
-	// Cut off the data we've already displayed
-	for (i in allData) {
-		if (i>= curkey) tmp.push(allData[i]);
+	if (allData.length==0) {
+		allData=data;
+		curkey=1;
+		nextupdate = allData.length/2;
+		return;
 	}
+	// Get the last set of data from the array to find out where it ends.
+	//var lastindex = (allData.length<2) ? allData.length-1 : allData.length
+	var lasttime = allData[allData.length-1].timestamp;
+	// Cut off the data we've already displayed
+	var tmp = allData.slice(curkey,allData.length);
 	// Only take new data
 	for (j in data) {
 		if (data[j].timestamp == lasttime) record = true;
 		if (record)	out.push(data[j]);
 	}
+	if (data.length>0 && out.length==0 && !record) out = data;
 	record = false;
 	// Combined the above to arrays together
-	tmp.concat(out);
+	allData = tmp.concat(out);
 	// Reset the data to play
-	allData = tmp;
 	curkey = 1;
 	nextupdate = allData.length/2;
 }
 
 function updateRealTime() {
-	if (curkey == Math.floor(allData.length/2) || curkey==1) getNewestBatch();
+	if (curkey == Math.floor((allData.length-1)/2)) getNewestBatch();
 	updateValues();
 }
 
-// Socket Code
-function connectToSocketServer () {
-	var socket = new io.Socket("localhost", {port: 8125, rememberTransport: false});
-    socket.connect();
-    socket.on('message', function(obj) {
-		alert(dump(obj));
-		for (var i in obj.buffer) updateSocketValues(obj.buffer[i]);
-	});
-}
+/*
+*	Replay Functions
+*/
 
-function updateSocketValues(json) {
-	try { 
-		data = $.parseJSON(json); 
-	}
-	catch (err) { 
-		alert("Bad data:" + err.message); 
-	}
-	for (var i in dataTypes) $("#"+dataTypes[i].label).html(data[dataTypes[i].label]+" "+dataTypes[i].suffix);
+function replaySliderChange() {
+	var selectedEvent = $("#replay_events option:selected").attr("title");
+	getReplayValues(replayevents[selectedEvent].timestamp_from,replayevents[selectedEvent].timestamp_to)
 }
-
-function initEvents(events) {
-	$("#replay_events").html("");
-	var options = "";
-	var len = events.length;
-	for (i=0;i<len;i++) {
-		options += "<option onclick='getReplayValues("+events[i].timestamp_from+","+events[i].timestamp_to+")'>"+events[i].title+"</option>";
-	}
-	$("#replay_events").html(options);
-	getReplayValues(events[len-1].timestamp_from,events[len-1].timestamp_to);
-}
-
 
 function getReplayValues(from,to) {
 	curkey = 1;
 	clearInterval(iv);
 	$.ajax({
-		url: 'http://49.156.18.20/api/replay.json?callback=initReplay&from='+from+'&to='+to,
-		dataType: 'script',
-		statusCode:{
-			400:function() {
-				
-			}
-		}
+		url: 'http://'+LIVESERVER+'/replay.json?callback=initReplay&from='+from+'&to='+to,
+		dataType: 'script'
 	});
+};
 
+var replayevents;
+function initEvents(events) {
+	replayevents = events;
+	$("#replay_events").html("");
+	var options = "";
+	var len = events.length;
+	for (i=0;i<len;i++) {
+		options += "<option title='"+i+"'>"+events[i].title+"</option>";
+	}
+	$("#replay_events").html(options);
+	$("#replay_events option:last").attr("selected","selected");
+	getReplayValues(events[len-1].timestamp_from,events[len-1].timestamp_to);
 }
+
 function initReplay (data) {
+	if (data.length<1) {
+		//online=true;
+		standby();
+		return;
+	}
 	try {
 		allData = data;
 		iv = setInterval("updateValues()", LIVEDURATION);
@@ -677,7 +798,6 @@ function initReplay (data) {
 	catch (error) {
 		alert ("Error retrieving data");
 	}
-
 }
 
 function resetUpdateTimer (delay) {
@@ -688,7 +808,12 @@ function resetUpdateTimer (delay) {
 }
 
 function updateValues() {
-	if (curkey < allData.length && curkey > 0) {
+	if (curkey < (allData.length) && curkey > 0) {
+		
+		if (allData.length==1) {
+			curkey--;
+		}
+		
 		online = true;
 		if (curlat == 0 && curlong == 0) { 
 			try { 
@@ -697,16 +822,27 @@ function updateValues() {
 			} catch (err) { }
 		}		
 		// Map calculations
-		var oldlat = allData[curkey-1]["latitude"];
-		var oldlong = allData[curkey-1]["longitude"];
-		curlat = (allData[curkey]["latitude"] == 0) ? curlat : allData[curkey]["latitude"]/60;
-		curlong = (allData[curkey]["longitude"] == 0) ? curlong : allData[curkey]["longitude"]/60;
-		var iconDirn = (curlong < allData[curkey-1]["longitude"]) ? "left" : "right";
+		curlat = (allData[curkey]["latitude"] == 0) ? curlat : allData[curkey]["latitude"]/60000;
+		curlong = (allData[curkey]["longitude"] == 0) ? curlong : allData[curkey]["longitude"]/60000;			
+		
+		try {
+			var oldlat = allData[curkey-1]["latitude"];
+			var oldlong = allData[curkey-1]["longitude"];
+			var iconDirn = (curlong < allData[curkey-1]["longitude"]) ? "left" : "right";
+		}
+		catch (err) {}
+		
 		//var angle = Math.round(heading(longDiff, latDiff, newlat, oldlat)*10)/10;
 		//allData[curkey]['heading'] = ((allData % 90) == 0 && allData[curkey-1]['heading']!=="undefined") ? allData[curkey-1]['heading'] : angle;
 		allData[curkey]['arraypower'] = allData[curkey]['arraypower']*-1;
+		
 		// Speed calculations
-		var oldspeed = Math.round(allData[curkey-1]["speed"]*100)/100;
+		
+		try {
+			var oldspeed = Math.round(allData[curkey-1]["speed"]*100)/100;
+		}
+		catch (err) {}
+		
 		var speed = Math.round(allData[curkey]["speed"]*100)/100;
 	
 		// Add photo if one exists
@@ -715,10 +851,11 @@ function updateValues() {
 		// Change the flash dials
 		try {
 			$('#speedo object').flash(function(){ this.changeSpeed(allData[curkey]['speed']); });
-			$('#motortemp object').flash(function(){ this.changeTemperature(allData[curkey]['heatsinktemp']); });
-			$('#heatsinktemp object').flash(function(){ this.changeTemperature(allData[curkey]['motortemp']); });	
+			$('#motortemp object').flash(function(){ this.changeTemperature(allData[curkey]['heatsinktemp']/1000); });
+			$('#heatsinktemp object').flash(function(){ this.changeTemperature(allData[curkey]['motortemp']/1000); });	
 		}
 		catch (error) {
+			console.log(error);
 			// No flash installed. We try canvas first, then flash, but maybe throw in just HTML?
 			//alert("Cannot adjust dials");
 		}
@@ -727,7 +864,7 @@ function updateValues() {
 		switch (REALTIME) {
 			case "Realtime":
 				allData[curkey]['distance'] = Math.round(distance(curlat, curlong, "-34.927165", "138.599691", "K")*ROUND)/ROUND;
-				$("#distancetime").html('Distance to Destination<br /><span class="temp-data">'+allData[curkey]["distance"]+'</span><span class="data-unit">Kilometres</span>')
+				$("#distancetime").html('Distance to Adelaide<br /><span class="temp-data">'+allData[curkey]["distance"]+'</span><span class="data-unit">Kilometres</span>')
 			break;
 			
 			case "Replay":
@@ -742,11 +879,13 @@ function updateValues() {
 		$('#data-age').html("Data is "+relative_live_time(allData[curkey]['timestamp']));
 		// Update everything else
 		for (var i in dataTypes) {
-			updateItem(dataTypes[i].label, allData[curkey-1][dataTypes[i].label], allData[curkey][dataTypes[i].label], LIVEDURATION, ' '+dataTypes[i].suffix);
+			var dFrom = (curkey>0) ? allData[curkey-1][dataTypes[i].label] : allData[curkey][dataTypes[i].label];
+			updateItem(dataTypes[i].label, dFrom, allData[curkey][dataTypes[i].label], LIVEDURATION, ' '+dataTypes[i].suffix);
 		}
 		
 		if (map_loaded) updateMap(iconDirn, speed+" km/h");
 		else if (map3D_loaded) update3DMap(newlat, newlong, iconDirn, speed+" km/h", allData[curkey]['heading']);
+		curkey++;
 	}
 	else {
 		switch (REALTIME) {
@@ -759,8 +898,7 @@ function updateValues() {
 				break;
 		}
 		return false;
-	}
-	curkey++;
+	}	
 }
 
 function addPhotoToMap () {
@@ -785,7 +923,7 @@ function addPhotoToMap () {
 }
 
 function relative_live_time (timestamp) {
-	var delta = parseInt((replay_since.getTime()/1000 - timestamp));
+	var delta = parseInt((replay_since.getTime() - timestamp)/1000);
 	//delta = delta + (replay_since.getTimezoneOffset() * 60);
 	if (delta < 60) return 'less than a minute old';
 	else if(delta < 120) return 'about a minute old';
@@ -797,7 +935,7 @@ function relative_live_time (timestamp) {
 }
 
 function getFormattedDate (timestamp) {
-	var date = new Date(timestamp*1000);
+	var date = new Date(timestamp);
 	var day = date.getDate();
 	var month="";
 	switch (date.getMonth().toString()) {
@@ -851,6 +989,8 @@ function getFormattedDate (timestamp) {
 }
 
 function updateItem (htmlID, u, v, t, suffix) {
+	$('#'+htmlID).html(Math.round(v*ROUND)/ROUND);
+	return;
 	clearInterval(updateIv[htmlID]);
 	time[htmlID]=0;
 	var a = ((v-u)/t);	//Fix this
@@ -865,43 +1005,12 @@ function burstUpdate (id, a, u) {
 	catch(err) { }
 }
 
-function makeLostConnectionOverlay() {
-	$("#live_container").animate({opacity:"0.5"}, "slow");
-	$("#mediaHeader").prepend("<div id='offline'><span id='offline_text'>Connection lost. Trying to reestablish connection.</span></div>");
-	
-	$("#offline")
-	$("#offline").fadeIn("slow");
-	lostconniv = setInterval('lostConnOverlayDots();',1000);
-}
-
-function makeEndOfDataOverlay() {
-	$("#live_container").animate({opacity:"0.5"}, "slow");
-	$("#mediaHeader").append("<div id='offline'><span id='offline_text'>End of replay. Click to restart.</span></div>");
-	$("#offline").fadeIn("slow").click(function() {
-		exitStandby();
-	});
-}
-
-function lostConnOverlayDots () {
-	if (dots==3) {
-		$("#offline_text").html("Connection lost. Trying to reestablish connection.");
-		dots=1;
-	}
-	else {
-		$("#offline_text").append(".");
-		dots++;
-	}
-}
-
 /*
 *	Maps specific code
 */
 
 function loadMaps() {
 	switch (MAPTYPE) {
-		case 'Earth':
-			google.load("earth","1", {"callback":loadEarth});
-			break;
 		case 'Maps':
 			google.load("maps", "3.x", {"callback" : initializeMap, "other_params": "sensor=false"});
 			break;
@@ -909,12 +1018,12 @@ function loadMaps() {
 }
 
 function initializeMap () {
-	curlat = 0;
-	curlong = 0
+	curlat = -25.61;
+	curlong = 134.3547;
 	// Set the initial parameters for the map
 	var latlng = new google.maps.LatLng(curlat, curlong);
 	var params = {
-     	zoom: 2,
+     	zoom: 4,
 		center: latlng,
 		mapTypeId: google.maps.MapTypeId.SATELLITE
 	};
@@ -937,16 +1046,22 @@ function initializeMap () {
 	loadTwitterMarkers();
 }
 
-function updateMap(direction, speed) {
+function updateMap(direction,speed,newlat,newlong) {
 	// Create the new position as a maps lat/long
-	var newPoint = new google.maps.LatLng(curlat, curlong);
+	var newPoint = new google.maps.LatLng(newlat||curlat, newlong||curlong);
 	// Center the map on the new location if the button is pressed.
-	if ($("#followmap").attr("checked")=="checked") map.panTo(newPoint);
+	if ($("#followmap").attr("checked")=="checked") {
+		map.setZoom(15);
+		map.panTo(newPoint);
+	}
 	// Set the marker to the new position
 	marker.setPosition(newPoint);
     // Change the icon depending on the location
-	icon = (direction=="left") ? PATHPREFIX+"/images/left-icon.png" : PATHPREFIX+"/images/right-icon.png";
+	var icon = (direction=="left") ? PATHPREFIX+"images/left-icon.png" : PATHPREFIX+"images/right-icon.png";
 	marker.setIcon(icon);
+	marker.setMap(map);
+	marker.setClickable=true;
+	
 	// Update the HTML for the info window
 	html = "Speed: "+speed;
 	infowindow.setContent(html);
@@ -955,6 +1070,12 @@ function updateMap(direction, speed) {
 function loadTwitterMarkers () {
 	var varhtml;
 	// Some temp code here
+	
+	// Get Twitter Feed
+	// Filter by set time and date (from, to)
+	// Add to map
+	// Set up the listeners for the click
+	
 	for (i=0; i<0; i++) {
 		var twitpos = new google.maps.LatLng(-34.948375,(150.53657+(i/1000)));
 		twitterm = new google.maps.Marker({
@@ -973,45 +1094,6 @@ function loadTwitterMarkers () {
 			if ($("#followmap").attr("checked")=="checked") $("#followmap").click();
 		});
 	}
-}
-
-/*
-*	Earth specific code
-*/
-
-function loadEarth() {
-   google.earth.createInstance('map_canvas', earthCallback, postError);
-}
-
-function earthCallback(instance) {
-   	ge = instance;
-   	ge.getWindow().setVisibility(true);
-	map3D_loaded = true;
-}
-
-function update3DMap (latitude, longitude, direction, speed, heading) {
-	// Create the placemark.	
-	placemark = ge.createPlacemark('');
-	//ge.getFeatures().removeChild(placemark);
-	// Set the placemark's location.  
-	var point = ge.createPoint('');
-	point.setLatitude(latitude);
-	point.setLongitude(longitude);
-	placemark.setGeometry(point);
-	// Add the placemark to Earth.
-	ge.getFeatures().appendChild(placemark);
-	// Create a new LookAt
-	var lookAt = ge.createLookAt('');
-	// Set the position values
-	lookAt.setLatitude(latitude);
-	lookAt.setLongitude(longitude);
-	lookAt.setRange(1000.0); //default is 0.0
-	if ((heading % 90) !== 0 && heading !== 0) {
-		lookAt.setHeading(heading);
-		$("#debug").html(heading);
-	} 
-	// Update the view in Google Earth	
-	ge.getView().setAbstractView(lookAt);
 }
 
 /*
