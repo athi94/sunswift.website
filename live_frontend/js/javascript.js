@@ -555,17 +555,7 @@ function exitStandby() {
 	//alert ("Solar car is online");
 };
 
-function setInternalTime(serverResponse) {
-	var now = new Date();
-	timeOffset = serverResponse.time - now.getTime();
-	current_time = serverResponse.time;
-	$(document).trigger('InternalTimeSetEvent',[{result:1}]);
-};
 
-function getInternalTime() {
-	var now = new Date();
-	return (now.getTime() + timeOffset);
-};
 
 function makeLostConnectionOverlay() {
 	//$("#live_container").animate({opacity:"0.5"}, "slow");
@@ -643,8 +633,8 @@ function updatePolledData(data) {
 		try { 
 			marker.setMap(map);
 			map.setZoom(4); 
-			
-		} catch (err) { 
+		} 
+		catch (err) { 
 			console.log(err);
 		}
 	}				
@@ -654,7 +644,7 @@ function updatePolledData(data) {
 		if (map_loaded) updateMap("right", data.speed+" km/h",data.latitude,data.longitude);
 		// Add photo if one exists
 		var dist = Math.round(distance(data.latitude, data.longitude, "-34.927165", "138.599691", "K")*ROUND)/ROUND;
-		if (data.photo) addPhotoToMap();
+		if (data.photo) addPhotoToMap(data.latitude,data.longitude,data.photo);
 	}
 
 	data.batterypower = Math.round(data.batterypower*ROUND*-1)/ROUND;
@@ -758,14 +748,21 @@ function updateRealTime() {
 	updateValues();
 }
 
+function setInternalTime(serverResponse) {
+	var now = new Date();
+	timeOffset = serverResponse.time - now.getTime();
+	current_time = serverResponse.time;
+	$(document).trigger('InternalTimeSetEvent',[{result:1}]);
+};
+
+function getInternalTime() {
+	var now = new Date();
+	return (now.getTime() + timeOffset);
+};
 /*
 *	Replay Functions
 */
-
-function replaySliderChange() {
-	var selectedEvent = $("#replay_events option:selected").attr("title");
-	getReplayValues(replayevents[selectedEvent].timestamp_from,replayevents[selectedEvent].timestamp_to)
-}
+var replayevents;
 
 function getReplayValues(from,to) {
 	curkey = 1;
@@ -775,8 +772,6 @@ function getReplayValues(from,to) {
 		dataType: 'script'
 	});
 };
-
-var replayevents;
 function initEvents(events) {
 	replayevents = events;
 	$("#replay_events").html("");
@@ -805,6 +800,11 @@ function initReplay (data) {
 	}
 }
 
+function replaySliderChange() {
+	var selectedEvent = $("#replay_events option:selected").attr("title");
+	getReplayValues(replayevents[selectedEvent].timestamp_from,replayevents[selectedEvent].timestamp_to)
+}
+
 function resetUpdateTimer (delay) {
 	clearInterval(iv);
 	for (i in updateIv) clearInterval(updateIv[i]);
@@ -814,12 +814,8 @@ function resetUpdateTimer (delay) {
 
 function updateValues() {
 	if (curkey < (allData.length) && curkey > 0) {
-		
-		if (allData.length==1) {
-			curkey--;
-		}
-		
 		online = true;
+		if (allData.length==1) curkey--;
 		if (curlat == 0 && curlong == 0) { 
 			try { 
 				map.setZoom(15); 
@@ -851,7 +847,7 @@ function updateValues() {
 		var speed = Math.round(allData[curkey]["speed"]*100)/100;
 	
 		// Add photo if one exists
-		if (allData[curkey]["photo"]) addPhotoToMap();
+		if (allData[curkey]["photo"]) addPhotoToMap(curlat,curlong,allData[curkey]["photo"]);
 		
 		// Change the flash dials
 		try {
@@ -906,24 +902,23 @@ function updateValues() {
 	}	
 }
 
-function addPhotoToMap () {
-	//alert("adding "+allData[curkey]["photo"]+"at lat: "+curlat+" long:"+curlong);
-	var photolatlng = new google.maps.LatLng(curlat,curlong);
+function addPhotoToMap (latitude,longitude,photo) {
+	var photolatlng = new google.maps.LatLng(latitude,longitude);
 	var photomarker = new google.maps.Marker({
 		position: photolatlng,
 		animation: google.maps.Animation.DROP,
 		title:'Photo',
 		icon:PATHPREFIX+"/images/photoicon.png",
-		html:"<div class='map_tweet'><a title='' target='_blank' href='/"+PATHPREFIX+"/images/live/"+allData[curkey]["photo"]+"'><img src='/"+PATHPREFIX+"/images/live/"+allData[curkey]["photo"]+"' height='229px' width='344px' /></a></div>"
+		html:"<div class='map_tweet'><a title='' target='_blank' href='"+photo+"'><img src='"+photo+"' height='229px' width='344px' /></a></div>"
 	});
 	photomarker.setMap(map);
 	photoinfo = new google.maps.InfoWindow();
 	// Bind the click event to open the info window
 	google.maps.event.addListener(photomarker, 'click', function() {
+		if ($("#followmap").attr("checked")=="checked") $("#followmap").click();
 		photoinfo.setContent(this.html);	
 	    photoinfo.open(map,this);
 		$("div.map_tweet a").lightBox({imagePathPrefix:PATHPREFIX});
-		if ($("#followmap").attr("checked")=="checked") $("#followmap").click();
 	});	
 }
 
