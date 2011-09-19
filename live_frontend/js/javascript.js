@@ -612,12 +612,17 @@ function startPolledRealTime() {
 		clearInterval(polledIv);	
 	} 
 	catch (err) {};
+	var fetchingPollData = false;			// This is a little variable to see whether we are still waiting for a previous request to finish
 	polledIv = setInterval(function() {
-		$.getScript('http://'+LIVESERVER+'/lastupdate.json?callback=updatePolledData');
+		if (!fetchingPollData) {
+			$.getScript('http://'+LIVESERVER+'/lastupdate.json?callback=updatePolledData');
+			fetchingPollData = true;
+		}
 	},POLLINTERVAL);
 };
 
 function updatePolledData(data) {
+	fetchingPollData = false;
 	if (!data && online) {
 		standby();
 		return;

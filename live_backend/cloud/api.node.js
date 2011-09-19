@@ -4,6 +4,7 @@ var sys = require("sys"),
 	Client = require('mysql').Client,	
 	DATABASE = require('./config.js').database,
 	TABLE = require('./config.js').table,
+	twitter = require('./config.js').twitter,
 	gzip = require('gzip'),
 	lastData = {},
 	lastDataString = "";
