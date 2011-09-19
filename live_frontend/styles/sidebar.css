@@ -46,7 +46,7 @@
     padding: 0;
 }
 .goldsponsors img {
-	padding:8px;
+	padding:4px;
 }
 
 .goldsponsors, #calendar, #twitter h2 {
@@ -71,7 +71,7 @@
 }
 .sponsorclass {
 	margin-top:25px;
-	margin-bottom: -2px;
+	margin-bottom: 8px;
 }
 .silversponsors table {
 	width:100%;
