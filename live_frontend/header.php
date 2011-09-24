@@ -57,12 +57,6 @@ $(window).load(function(){
 </script>
 <![endif]-->
 <script type="text/javascript">
-<?php 
-echo "PATHPREFIX = '".PATHPREFIX."';";
-// Bad hack
-$ls = ($_SERVER['SERVER_NAME']=='localhost') ? 'localhost:8000' : '49.156.18.20/api';
-echo "LIVESERVER = '".$ls."';"; 
-?>
 var _gaq = _gaq || [];
 _gaq.push(['_setAccount', 'UA-8965962-4']);
 _gaq.push(['_trackPageview']);

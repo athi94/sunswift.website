@@ -2,56 +2,7 @@
 var albums = [];
 var videos = [];
 var tweets = [];
-var TWITTERINTERVAL = 60000;
-var CR = 5;
-// Live 
-var REALTIME = 'Realtime'			// Options: Realtime, Socket, Replay
-var LIVEDURATION = 2000;
-var REALTIMEUPDATEINTERVAL = 60000;
-var POLLINTERVAL = 2000;
-var ROUND = 100;
-var MAPTYPE = 'Maps';				// Options: Earth, Maps
-var PATHPREFIX = '/wp-content/themes/sunswift';
-var LIVESERVER = '49.156.18.20';
-var MAXARRAY = 1300;
-var BATCHLENGTH = 2000;
-var dataTypes = [
-	{'label':'motorpower','suffix':'W'},
-	{'label':'batterypower','suffix':'W'}
-];
-var polling=true;		// Config variable to set whether we should do polling or buffered realtime
-var follow = true;
-var allData = Array();
-var curkey = 1;
-var map_loaded = false;
-var map3D_loaded = false;
-var map;
-var marker;
-var ge;
-var oldlat = 0;
-var oldlong = 0;
-var curlat = 0;
-var curlong = 0;
-var infowindow;
-var placemark;
-var finalSpeed = 0;
-var time=[];
-var tmpVal=[];
-var updateIv=[]; 			// Burst update interval
-var iv;					// Update value interval
-var sb;					// Standby interval
-var delayiv;
-var twitterm=[];
-var tinfowindow=[];
-var replay_since = new Date();	// new Date();
-var lastTime = 1292625914.81;
-var timeOffset;
-var online=false;
-var nextupdate=15;
-var lostconniv;
-var dots = 0;
-var events;
-
+var CR = 5;		// Corner radius
 
 function $_GET() {
     var vars = [], hash;
