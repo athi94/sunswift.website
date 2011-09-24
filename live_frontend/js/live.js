@@ -53,6 +53,135 @@ var dots = 0;
 var events;
 
 
+
+function launchLive() {
+	if (navigator.userAgent.indexOf("MSIE")!=-1) alert("Unfortunately we do not have the resources to support Internet Explorer, and cannot guarantee Sunswift Live will function properly.");
+	$("#panel_image,#media_container").fadeOut("fast");
+	
+	$("#mediaHeader").animate({height:"650px"}, "fast", function() {
+		
+		$(this).children("#live_container").css({display:"block"}); 
+		
+		$('#speedo').flash({
+			swf: PATHPREFIX+'/images/Speedo.swf',
+			id: "speedo-flash",
+			width: 200,
+			height: 192,
+			play: false,
+			allowscriptaccess: 'always',
+			allowfullscreen: 'false',
+			wmode: 'transparent'
+		});
+		
+		$('#motortemp').flash({
+			swf: PATHPREFIX+'/images/Temp-Guage.swf',
+			id:"motortemp-flash",
+			width: 100,
+			height: 51,
+			play: false,
+			allowscriptaccess: 'always',
+			allowfullscreen: 'false',
+			wmode: 'transparent'
+		});
+		
+		$('#heatsinktemp').flash({
+			swf: PATHPREFIX+'/images/Temp-Guage.swf',
+			id:"heatsink-flash",
+			width: 100,
+			height: 51,
+			play: false,
+			allowscriptaccess: 'always',
+			allowfullscreen: 'false',
+			wmode: 'transparent'
+		});
+		// Create the reflections of the flash objects
+		$("#speedo").append('<img src="'+PATHPREFIX+'/images/Speedometer-grey.jpg" />')
+		$("#speedo img").reflect({height:35});
+		$('#motortemp').append('<img src="'+PATHPREFIX+'/images/temp-guage-reflect.png" width="100" />')
+		$("#motortemp img").reflect({height:25});
+		$('#heatsinktemp').append('<img src="'+PATHPREFIX+'/images/temp-guage-reflect.png" width="100" />')
+		$("#heatsinktemp img").reflect({height:25});
+
+		$("#array-outer-container").corner({
+			tl: { radius: 2 },
+			tr: { radius: 2 },
+			bl: { radius: 2 },
+			br: { radius: 2 },
+			antiAlias: true,
+			autoPad: true,
+			validTags: ["div"]
+		});
+
+		// Create the control group actions
+		$("#followmap").button();
+		$("#livestate").buttonset();
+		
+		$("input:radio[name=radio]").change(function() {
+			changeState($("input:radio[name='radio']:checked").val());
+		});
+		
+		$("#beginning").button({
+			text: false,
+			icons: { primary: "ui-icon-seek-start" }
+		}).click(function() {
+			curkey=1;
+			updateValues();
+			if ($("#play").text()=="play") for (i in updateIv) clearInterval(updateIv[i]);	
+		});
+		
+		$( "#play" ).button({
+			text: false,
+			icons: { primary: "ui-icon-pause" }
+		}).live('click', function() {
+			var options;
+			if ( $( this ).text() === "pause" ) {
+				stopAllIntervals();
+				options = {
+					label: "play",
+					icons: {
+						primary: "ui-icon-play"
+					}
+				};
+			} 
+			else {
+				iv = setInterval("updateValues()", LIVEDURATION);
+				options = {
+					label: "pause",
+					icons: {
+						primary: "ui-icon-pause"
+					}
+				};
+			}
+			$( this ).button( "option", options );
+		});
+		$("#slider").slider({
+			min: -2000,
+			max: -20,
+			value: -2000,
+		   	slide: function(event, ui) { 
+				resetUpdateTimer(ui.value);
+			}
+		});
+		
+		
+
+		// Now the meaty bits
+		loadMaps();
+		//loadEarth();
+		//initialize();
+		
+		$("input:radio[name=radio]").each(function() {
+			if ($(this).val()==REALTIME) $(this).click();
+		});
+		
+		
+		_gaq.push(['_trackEvent', 'Live', 'Initialised']);
+		//twitteriv = setInterval("updateTweetMaps();", TWITTERINTERVAL);
+	});
+}
+
+
+
 /*
 *	State Functions
 */
