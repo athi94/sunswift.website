@@ -17,6 +17,4 @@ while ($file = readdir($res)) {
 	);
 	$live->AppendDBWithPhotos($in);
 }
-
-
 ?>

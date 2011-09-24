@@ -122,7 +122,6 @@ Class Live
 	public function getClosestLatLng($timestamp) {
 		$table = $this->params['table'];
 		$query = "SELECT latitude,longitude,timestamp FROM $table WHERE timestamp < $timestamp ORDER BY timestamp DESC LIMIT 1";
-		
 		$result = $this->queryDB($query);
 		if (mysql_num_rows($result)>0)	return json_encode($this->getRows($result));
 		else return null;	

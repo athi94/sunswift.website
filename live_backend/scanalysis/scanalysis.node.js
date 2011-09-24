@@ -7,7 +7,7 @@ var sys = require('sys'),
 	TELEMETRYINTERVAL = 2000,
 	DATAPOINTINTERVAL = 2000,
 	CREDENTIALS = 'SOMETEXT',
-	HOST = 'localhost',
+	HOST = '49.156.18.20',
 	PORT = '80',
 	PATH = '/live/cloud/update.php',
 	sqlfile = './scandal.sqlite3',
@@ -20,7 +20,7 @@ var sys = require('sys'),
 var nodes = {
 	speed: {
 		node:20,
-		channel:6
+		channel:6	// TO get
 	},
 	batterypower: {
 		node:10,
