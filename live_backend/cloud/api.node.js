@@ -54,9 +54,8 @@ console.log("Sunswift Live now serving requests.");
 
 function connect() {
 	var client = new Client();
-	client.user = 'root';
-	client.host = 'localhost';
-	client.password = '';
+	client.user = DBUSER;
+	client.password = DBPASS;
 	return client;
 }
 
