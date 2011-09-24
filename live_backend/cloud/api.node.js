@@ -16,7 +16,7 @@ var sys = require("sys"),
 	
 server = http.createServer(function(request, response){
 	// Parse the url
-	var path = PATHPREFIX+url.parse(request.url).pathname;
+	var path = url.parse(request.url).pathname.replace(PATHPREFIX,'');
 	var _GET = url.parse(request.url, true).query;
 	
 	switch (path) {
