@@ -6,7 +6,9 @@ var sys = require("sys"),
 	TABLE = require('/etc/live/config.js').table,
 	DBUSER = require('/etc/live/config.js').user,
 	DBPASS = require('/etc/live/config.js').pass,
+	PATHPREFIX = require('/etc/live/config.js').pathprefix,
 	twitter = require('/etc/live/config.js').twitter,
+	PORT = require('/etc/live/config.js').port,
 	gzip = require('gzip'),
 	lastData = {},
 	lastDataString = "";
@@ -14,7 +16,7 @@ var sys = require("sys"),
 	
 server = http.createServer(function(request, response){
 	// Parse the url
-	var path = url.parse(request.url).pathname;
+	var path = PATHPREFIX+url.parse(request.url).pathname;
 	var _GET = url.parse(request.url, true).query;
 	
 	switch (path) {
@@ -44,7 +46,7 @@ server = http.createServer(function(request, response){
 			break;
 	}
 });
-server.listen(8000);
+server.listen(PORT);
 server.on('error', function (e) {
     console.error("Ignoring exception: " + e);
 });
