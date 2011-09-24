@@ -35,7 +35,7 @@
 <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js" type="text/javascript"></script>
 <script src="<?php echo SCRIPTSPATH; ?>/libraries.min.js" type="text/javascript" charset="utf-8"></script>
 <script src="<?php echo SCRIPTSPATH; ?>/javascript.js" type="text/javascript" charset="utf-8"></script>
-
+<script src="<?php echo SCRIPTSPATH; ?>/live.js" type="text/javascript" charset="utf-8"></script>
 <?php wp_head(); ?>
 <?php if (is_404()): ?>
 <style>
