@@ -2,6 +2,7 @@ var sys = require('sys'),
 	http = require('http'),
 	gzip = require('gzip'),
 	util = require('util'),
+	fs = require('fs'),
 	sqlite3 = require('sqlite3').verbose(),
 	UPDATEINTERVAL = 5000,
 	TELEMETRYINTERVAL = 2000,
@@ -18,37 +19,69 @@ var sys = require('sys'),
 	telData = {};
 	
 var nodes = {
-	speed: {
-		node:20,
-		channel:6	// TO get
+	speed: {	// done
+		node:12, //done
+		channel:6	// done
 	},
-	batterypower: {
-		node:10,
-		channel:6
+	batterypower: {	//done
+		node:28,		
+		channel:3
 	},
 	arraypower: {
 		node:40,
 		channel:1	// Check if this is 1,2,3
 	},
-	motorpower: {
-		node:40,
-		channel:3	// Check if this is 1,2,3
+	motorpower: {	// done
+		node:31,
+		channel:0	
 	},
 	motortemp: {
-		node:20,
-		channel:13
+		node:12, //done
+		channel:11 // done
 	},
 	heatsinktemp: {
-		node:20,
-		channel:12
+		node:12, //done
+		channel:10 // done
 	},
-	latitude: {
+	latitude: {	//done
 		node:30,
 		channel:1
 	},
-	longitude: {
+	longitude: {	// done
 		node:30,
 		channel:2
+	},
+	mppt1i: {
+		node:170,
+		channel:1
+	},
+	mppt1v: {
+		node:170,
+		channel:0
+	},
+	mppt2i: {
+		node:160,
+		channel:1
+	},
+	mppt2v: {
+		node:160,
+		channel:0
+	},
+	mppt3i: {
+		node:185,
+		channel:1
+	},
+	mppt3v: {
+		node:185,
+		channel:0
+	},	
+	buscurrent: {
+		node: 12,
+		channel:4
+	},
+	busvoltage:{
+		node:12,
+		channel:5
 	}
 };
 
@@ -72,11 +105,50 @@ db.on('open',function() {
 /*
 *	Telemetry Init
 */
-var app = require('express').createServer();
-
+var express = require('express'),
+	form = require('connect-form'),
+	app = express.createServer(
+		form({ keepExtensions: true })
+	);
+app.use(express.bodyParser());
 app.get('/recent.json', function(req, res){
   	res.writeHead(200);
 	res.end(JSON.stringify(telData[0]));
+});
+
+app.get('/twitter',function(req,res) {
+	fs.readFile('./twitter.html',function(err,data) {
+		if (err) {
+			res.writeHead(200);
+			res.end('Error reading twitter.html');
+			return;
+		}
+		data = data.toString().replace('{LAT}',telData.latitude || '');
+		data = data.toString().replace('{LONG}',telData.longitude||'');	
+
+		res.writeHead(200,{'Content-Type':'text/html'});
+		res.end(data);
+	});
+});
+
+app.get('/logo.png',function(req,res) {
+	fs.readFile('./logo.png',function(err,data) {
+		res.writeHead(200,{'Content-Type':'image/png'});
+		res.end(data);
+	});
+});
+
+app.post('/twitter',function(req,res) {
+	req.form.complete(function(err, fields, files){
+	    if (err) {
+			console.log(err);
+	    	next(err);
+	    } 
+		else {
+	      console.log('\n%s to %s',  util.inspect(files), util.inspect(fields));
+	      res.redirect('back');
+	    }
+	});
 });
 
 app.listen(8080,'localhost',function() {
